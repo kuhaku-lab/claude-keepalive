@@ -12,7 +12,7 @@
 
 ## Status
 
-**v0.x — early development.** The interactive warm-keepalive path is wired end-to-end and verified against a real `claude` CLI (`pnpm smoke:warm`: ~12 s cold, ~7 s warm on the same session). Unit tests cover the pool, isolation, eviction, crash-recovery, hook-script branches, and framing transport contracts. Outstanding work is tracked in `TODO.md` — most importantly the fresh-conversation strategy (invariant #1) before this is suitable for production workloads.
+**v0.x — early development.** The interactive warm-keepalive path is wired end-to-end and verified against a real `claude` CLI (`pnpm smoke:warm`: ~12 s cold, ~7 s warm on the same session). The fresh-conversation contract (invariant #1) is enforced via a system-prompt directive and a bounded `maxRequestsPerSession`, with `pnpm smoke:leakage` and `test/e2e/warm.test.ts` as regression gates. Three-layer test setup (unit / integration / e2e) is live; `pnpm test` runs unit + integration cheaply, `RUN_E2E=1 pnpm test:e2e` exercises the real-`claude` layer. Remaining work — `.ready` handshake, `mode: 'print'` wiring — is tracked in `TODO.md`.
 
 ---
 

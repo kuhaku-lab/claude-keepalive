@@ -47,11 +47,12 @@
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",
     "test:integration": "vitest run test/integration",
-    "test:e2e": "vitest run test/e2e",
+    "test:e2e": "RUN_E2E=1 vitest run test/e2e",
     "lint": "biome lint",
     "format": "biome format --write",
     "check": "biome check --write",
-    "smoke:warm": "pnpm build && node scripts/warm-smoke.mjs"
+    "smoke:warm": "pnpm build && node scripts/warm-smoke.mjs",
+    "smoke:leakage": "pnpm build && node scripts/leakage-smoke.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
