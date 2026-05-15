@@ -29,20 +29,54 @@ export interface WarmSessionInputs {
  * nothing else. Pool decisions live in the pool ([[keepalive-invariants]]
  * rule 4).
  */
+/**
+ * Maximum bytes of stderr we retain to attach as diagnostic context when the
+ * process dies. Kept small on purpose — operators only need a tail.
+ */
+const STDERR_TAIL_BYTES = 4096;
+
 export class WarmSession implements Session {
   readonly id: string;
   readonly spawnedAt: number;
   private served = 0;
   private destroyed = false;
+  private stderrTail = '';
   private readonly emitter = new EventEmitter();
 
   constructor(private readonly inputs: WarmSessionInputs) {
     this.id = inputs.id;
     this.spawnedAt = inputs.clock.now();
+
+    // Drain stdout. We carry no protocol on stdout (the file-based transport
+    // does everything), but the OS pipe buffer is finite (~64KB on Linux/
+    // macOS). If we never read, claude's writes will block once the buffer
+    // fills, manifesting as a hang or a SIGPIPE crash. Attaching a `data`
+    // listener is enough to make Node drain the pipe continuously.
+    inputs.proc.stdout?.on('data', () => {
+      /* drain only — we don't care about the contents */
+    });
+
+    // Drain stderr the same way, but keep a small tail so a crash surfaces
+    // real diagnostic context (claude's error messages, missing flag warnings,
+    // etc.) instead of just `exit:1`.
+    inputs.proc.stderr?.on('data', (chunk: Buffer) => {
+      this.stderrTail = (this.stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_BYTES);
+    });
+
     inputs.proc.on('exit', (code: number | null) => {
-      if (!this.destroyed) {
-        this.emitter.emit('crash', { reason: `exit:${code ?? 'unknown'}` });
+      if (this.destroyed) return;
+      const tail = this.stderrTail.trim();
+      if (tail) {
+        // Make the diagnostic visible to operators even if their consumer
+        // code never listens to crash events.
+        console.error(
+          `[claude-keepalive] session ${this.id} exited (code=${code ?? 'unknown'}). stderr tail:\n${tail}`,
+        );
       }
+      const reason = tail
+        ? `exit:${code ?? 'unknown'} -- stderr tail: ${tail.slice(-1024)}`
+        : `exit:${code ?? 'unknown'}`;
+      this.emitter.emit('crash', { reason });
     });
   }
 

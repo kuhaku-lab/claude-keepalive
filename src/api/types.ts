@@ -54,7 +54,13 @@ export type KeepaliveErrorCode =
 
 export interface ClientEvents {
   'session.spawned': (info: { sessionId: string }) => void;
-  'session.evicted': (info: { sessionId: string; reason: EvictionReason }) => void;
+  /**
+   * Emitted when a warm session is evicted from the pool. `detail` is an
+   * optional, free-form diagnostic string — when `reason === 'crashed'` it
+   * typically carries an exit code plus a tail of the underlying claude
+   * process's stderr, suitable for operator triage.
+   */
+  'session.evicted': (info: { sessionId: string; reason: EvictionReason; detail?: string }) => void;
   'request.done': (info: { requestId: string; sessionId: string; durationMs: number }) => void;
   'request.error': (info: { requestId: string; code: KeepaliveErrorCode }) => void;
 }
