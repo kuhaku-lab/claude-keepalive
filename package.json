@@ -1,0 +1,46 @@
+{
+  "name": "claude-keepalive",
+  "version": "0.0.1",
+  "description": "Drop-in replacement for `claude -p` that eliminates cold-start by reusing warm claude processes.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "check": "biome check --write",
+    "smoke": "pnpm build && node scripts/smoke.mjs",
+    "smoke:warm": "pnpm build && node scripts/warm-smoke.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "keepalive",
+    "warm-pool"
+  ],
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.15",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
