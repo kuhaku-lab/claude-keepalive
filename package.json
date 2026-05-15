@@ -1,6 +1,6 @@
 {
   "name": "claude-keepalive",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Drop-in replacement for `claude -p` that eliminates cold-start by reusing warm claude processes.",
   "license": "Apache-2.0",
   "author": "kuhaku",
