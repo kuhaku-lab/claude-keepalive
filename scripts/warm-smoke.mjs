@@ -15,7 +15,7 @@
 
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createClient } from '../dist/index.js';
+import { createClient } from '../dist/index.mjs';
 
 const RUNTIME = join(process.cwd(), 'runtime-smoke');
 

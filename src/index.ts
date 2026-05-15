@@ -61,10 +61,3 @@ export function createClient(opts: ClientOptions = {}): KeepaliveClient {
     random: systemRandom,
   });
 }
-
-// Re-exported for tests under this repo. Not part of the public API.
-export { buildClient as _internal_buildClient } from './api/client.js';
-export type {
-  Session as _internal_Session,
-  SessionFactory as _internal_SessionFactory,
-} from './session/index.js';
