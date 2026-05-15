@@ -58,9 +58,14 @@ async function main() {
     console.log(
       `[warm-smoke] session reuse = ${r1.sessionId === r2.sessionId ? 'YES (same warm session)' : 'NO'}`,
     );
+    const cold = t2 - t1; // wall of r1 (t2 was captured immediately after r1)
+    const warm = Date.now() - t2; // wall of r2
     if (r1.sessionId === r2.sessionId) {
-      const speedup = (Date.now() - t2) / (Date.now() - t1);
-      console.log(`[warm-smoke] r2/r1 ratio  = ${speedup.toFixed(2)} (lower = warm benefit)`);
+      console.log(`[warm-smoke] cold wall   = ${cold}ms`);
+      console.log(`[warm-smoke] warm wall   = ${warm}ms`);
+      console.log(
+        `[warm-smoke] warm/cold   = ${(warm / cold).toFixed(2)}  (< 1.0 means warm wins; spawn is amortised, idle-tick overhead is the offset)`,
+      );
     }
   } catch (err) {
     console.error('[warm-smoke] FAILED:', err?.message ?? err);

@@ -75,6 +75,32 @@ A fake-`claude` Node subprocess for the integration layer (originally planned he
 
 ---
 
+## ✅ v0.1.1 — drain + stderr tail (RESOLVED, 2026-05-15)
+
+`WarmSession` was never reading from the child's stdout/stderr pipes, causing potential SIGPIPE on long-running claude output. Fixed by attaching passive data listeners, retaining the last 4 KB of stderr, and surfacing it via `console.error` and the new `session.evicted.detail` field. This patch was load-bearing for finding the next bug (see v0.1.2).
+
+---
+
+## ✅ v0.1.2 — stdin EOF for true interactive mode (RESOLVED, 2026-05-15)
+
+The test-service smoke (examples/test-service + curl) revealed via v0.1.1's stderr-tail that claude was hitting `Warning: no stdin data received in 3s, proceeding without it.` and exiting cleanly with code 0 — the warm-keepalive trick was never engaging. Root cause: `stdio: ['pipe', 'pipe', 'pipe']` left an open-but-empty stdin pipe that claude read for input. Fixed by switching to `stdio: ['ignore', 'pipe', 'pipe']` so claude sees stdin EOF immediately and enters its interactive Stop-hook idle loop.
+
+---
+
+## 🟡 #7 — investigate idle-tick latency cost
+
+Empirical observation in 2026-05 with claude 2.1.141: on a warm session, the wall time for request N+1 can exceed request N+0 (the cold spawn). Hypothesis: each idle "--- TURN START ---" tick triggers a non-trivial agent turn (claude responds with ".", Stop hook fires again). When request N+1 arrives mid-idle, framing waits for the current idle turn to complete before its prompt is injected.
+
+If true, the warm-pool value drops: spawn savings (~5 s) are offset by idle-tick overhead (~3–5 s per tick). Mitigations to evaluate:
+
+1. **Make idle responses cheaper**: tune the system prompt so claude responds to `--- TURN START ---` with a literal single character or empty string, ideally zero token.
+2. **Tighten the idle interval**: drive Stop-hook firing only when there's work, not constantly. Today the hook fires on every stop; we could investigate whether claude needs a Stop reason on every stop or whether we can let some stops succeed (which would terminate the session — probably not what we want).
+3. **Stream the prompt injection earlier**: drive `.in-request` write earlier in the request lifecycle so the next Stop-hook fire (rather than the second-next) picks it up.
+
+Action: instrument `warm-smoke.mjs` to print timing breakdown (spawn / first-Stop-fire / response / between-requests / second-response) so we know where time is spent.
+
+---
+
 ## 📋 Reference
 
 - Skills (live spec): `.claude/skills/keepalive-*/SKILL.md`
