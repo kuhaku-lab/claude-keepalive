@@ -2,21 +2,46 @@
   "name": "claude-keepalive",
   "version": "0.0.1",
   "description": "Drop-in replacement for `claude -p` that eliminates cold-start by reusing warm claude processes.",
+  "license": "Apache-2.0",
+  "author": "kuhaku",
+  "homepage": "https://github.com/kuhaku/claude-keepalive#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kuhaku/claude-keepalive.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kuhaku/claude-keepalive/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "keepalive",
+    "warm-pool",
+    "stop-hook",
+    "task-runner"
+  ],
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "README-JP.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsdown",
+    "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,20 +51,12 @@
     "lint": "biome lint",
     "format": "biome format --write",
     "check": "biome check --write",
-    "smoke": "pnpm build && node scripts/smoke.mjs",
     "smoke:warm": "pnpm build && node scripts/warm-smoke.mjs"
   },
-  "keywords": [
-    "claude",
-    "claude-code",
-    "keepalive",
-    "warm-pool"
-  ],
-  "license": "ISC",
-  "packageManager": "pnpm@10.33.0",
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
     "@types/node": "^22.10.0",
+    "tsdown": "^0.22.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

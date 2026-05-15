@@ -1,5 +1,5 @@
-import type { ClientOptions, KeepaliveClient } from '../../src/index.js';
-import { _internal_buildClient } from '../../src/index.js';
+import { buildClient } from '../../src/api/client.js';
+import type { ClientOptions, KeepaliveClient } from '../../src/api/types.js';
 import type { SessionFactory } from '../../src/session/index.js';
 import { createFakeClaude, type FakeClaude } from './fake-claude.js';
 import { createTestClock, immediateSleeper, type TestClock } from './test-clock.js';
@@ -21,7 +21,7 @@ export interface TestPool extends KeepaliveClient {
 export function createTestPool(inputs: TestPoolInputs): TestPool {
   const clock = inputs.clock ?? createTestClock();
   let counter = 0;
-  const client = _internal_buildClient(inputs, {
+  const client = buildClient(inputs, {
     factory: inputs.factory,
     clock,
     sleeper: immediateSleeper,

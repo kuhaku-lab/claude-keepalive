@@ -4,7 +4,7 @@
 
 [English README](./README.md)
 
-`claude -p "..."` は呼び出すたびにプロセス起動コストを丸ごと払います（モダンな Mac で ~5〜10秒）。1時間に数百回 Claude を呼ぶタスクランナー（Multica や社内プラットフォーム、自前の CI ワーカーなど）では、この cold-start が壁時計時間の大半を占めます。
+`claude -p "..."` は呼び出すたびにプロセス起動コストを丸ごと払います（モダンな Mac で ~5〜10秒）。1時間に数百回 Claude を呼ぶタスクランナーでは、この cold-start が壁時計時間の大半を占めます。
 
 `claude-keepalive` は少数の `claude` プロセスを interactive mode で warm に保ち、stop-hook 注入チャネル経由で各リクエストをルーティングします — `claude -p` と同じインターフェース、リクエスト単位の隔離は保ったまま、cold-start は warm session につき1回だけ払えば済みます。
 
@@ -374,4 +374,4 @@ pnpm smoke         # 実 `claude` での e2e (one-shot print 経路、~15秒、A
 
 ## ライセンス
 
-ISC
+Apache-2.0

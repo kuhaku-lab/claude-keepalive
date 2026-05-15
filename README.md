@@ -4,7 +4,7 @@
 
 [日本語版 README はこちら / Japanese README](./README-JP.md)
 
-`claude -p "..."` pays the full process-startup cost on every invocation (~5–10 s on a modern Mac). For a task runner that calls Claude hundreds of times an hour (Multica, internal platforms, custom CI workers), that cold-start dominates wall-clock time.
+`claude -p "..."` pays the full process-startup cost on every invocation (~5–10 s on a modern Mac). For a task runner that calls Claude hundreds of times an hour, that cold-start dominates wall-clock time.
 
 `claude-keepalive` keeps a small pool of `claude` processes warm in interactive mode and routes each request to one of them via the stop-hook injection channel — same surface as `claude -p`, isolation guarantees preserved per-request, cold-start paid only once per warm session instead of once per request.
 
@@ -373,4 +373,4 @@ Coverage gates: 85% lines on `src/api`, `src/pool`, `src/session`, `src/core`; 1
 
 ## License
 
-ISC
+Apache-2.0
