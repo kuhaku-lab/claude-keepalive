@@ -15,7 +15,11 @@ export interface PoolOptions {
 
 export const defaultPoolOptions: PoolOptions = {
   size: 1,
-  maxRequestsPerSession: 100,
+  // 50 caps context-history drift on a single warm session. The system-prompt
+  // contract tells the agent to treat each turn as independent, but claude's
+  // attention window still includes prior turns until we evict. 50 × per-turn
+  // tokens stays well under the 200K context window. See TODO #1.
+  maxRequestsPerSession: 50,
   maxSessionAgeMs: 60 * 60 * 1000,
   maxIdleMs: 10 * 60 * 1000,
   acquireTimeoutMs: 30_000,

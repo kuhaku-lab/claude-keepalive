@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { rm } from 'node:fs/promises';
 import type { RunStreamEvent } from '../api/types.js';
 import type { Clock, Sleeper } from '../core/clock.js';
 import type { ProcessHandle } from '../core/proc.js';
@@ -91,6 +92,15 @@ export class WarmSession implements Session {
     this.destroyed = true;
     try {
       this.inputs.proc.kill('SIGTERM');
+    } catch {
+      /* best-effort */
+    }
+    // Clear the per-session state dir so a future spawn that happens to draw
+    // the same session id never sees stale flag files (.responded, .prompt,
+    // partial response captures, etc.). claude is being terminated anyway,
+    // so any in-flight writes it loses are by definition discardable.
+    try {
+      await rm(this.inputs.paths.root, { recursive: true, force: true });
     } catch {
       /* best-effort */
     }

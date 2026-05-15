@@ -12,7 +12,7 @@
 
 ## ステータス
 
-**v0.x — 早期開発中。** Interactive warm-keepalive 経路は end-to-end で配線され、実 `claude` CLI 相手に検証済み（`pnpm smoke:warm`: 同一 session で cold ~12秒、warm ~7秒）。Unit テストで pool / 隔離 / エビクション / クラッシュ復帰 / hook スクリプト分岐 / framing トランスポートの各契約をカバー済み。残作業は `TODO.md` で追跡 — 特に fresh-conversation 戦略（invariant #1）が本番ワークロードへの適用前にクローズ必要。
+**v0.x — 早期開発中。** Interactive warm-keepalive 経路は end-to-end で配線され、実 `claude` CLI 相手に検証済み（`pnpm smoke:warm`: 同一 session で cold ~12秒、warm ~7秒）。Fresh-conversation 契約（invariant #1）は system-prompt 制約 + `maxRequestsPerSession` 制限で担保し、`pnpm smoke:leakage` と `test/e2e/warm.test.ts` を回帰ゲートとしている。3層テスト構成（unit / integration / e2e）稼働中。`pnpm test` で unit + integration を低コストで実行、`RUN_E2E=1 pnpm test:e2e` で実 `claude` を叩く e2e 層を回す。残作業 — `.ready` ハンドシェイク、`mode: 'print'` 配線 — は `TODO.md` で追跡。
 
 ---
 
