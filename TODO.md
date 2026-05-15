@@ -30,14 +30,23 @@ Strategy (a) (`/clear` injection) remains unexplored — only investigate if a f
 
 ---
 
-## 🟡 #2 — `.ready` handshake wait in `spawn.ts`
+## ✅ #2 — `.ready` handshake wait (RESOLVED in v0.1.4)
 
-`src/session/spawn.ts::spawnWarmProcess` returns immediately after `launch()`. There's a TODO marker in the code. Today the first request just polls the response file until claude finishes booting (~5–10s) and writes a response, so the slow boot manifests as a slow first request rather than a clean error. Two problems:
+`spawnWarmProcess` now polls for `paths.lastTick` after launching `claude` and only returns when the first stop-hook fire has completed (= claude is booted and idling). Bounded by `spawnTimeoutMs`; rejects with the new `SPAWN_TIMEOUT` error code if claude never gets there. The doomed process is SIGTERM'd on the failure path so we don't leak zombies.
 
-- If claude fails to boot (bad binary, settings.json malformed), the first request will silently TIMEOUT with no diagnostic about boot vs runtime.
-- We can't distinguish "spawn in flight" from "spawn complete" at the pool level, which makes accurate metrics hard.
+This unblocked `prewarm()` (v0.1.4 #3) — without a real readiness signal, prewarm could only promise "spawn fired", not "ready to serve".
 
-**Fix.** Wait for the first `.last-tick` write (proof the stop hook fired at least once = claude is booted and idling). Bound by `spawnTimeoutMs`. Reject with a structured error if exceeded.
+---
+
+## ✅ v0.1.4 — prewarm() + warmupPrompt (RESOLVED)
+
+Three changes shipped together (cf. `pnpm test:unit -- test/unit/prewarm.test.ts`):
+
+- `Pool.prewarm()` — spawns up to `size` sessions in parallel; idempotent.
+- `KeepaliveClient.prewarm()` — calls Pool.prewarm(), then (if `warmupPrompt` is set) runs that prompt on every warm session and discards the result.
+- `ClientOptions.warmupPrompt?: string` — analogous to Anthropic's prompt-caching pre-warming pattern, but applied at our warm-pool layer. Without it, prewarm only zeroes out CLI spawn cost; with it, Anthropic's prompt cache is also pre-filled.
+
+New public error code: `SPAWN_TIMEOUT`.
 
 ---
 

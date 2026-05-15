@@ -108,9 +108,11 @@ src/session/
 Each session gets its own state dir, isolated from siblings:
 
 ```
-runtime/sessions/<session-id>/
+runtime/sessions/<session-id>/   # absolute path — runtimeDir is resolve()'d
+                                 # at createClient time so settings.json's
+                                 # `command` and the hook script's flag-file
+                                 # checks are cwd-independent (v0.1.3 fix).
   .pid                 # claude process pid
-  .ready               # presence = session finished initial handshake
   .in-request          # presence = a real request is in flight (hook reads this)
   .prompt              # the prompt text the hook should inject as `reason`
   .request-id          # current request id (for log correlation)
@@ -119,7 +121,11 @@ runtime/sessions/<session-id>/
   .responses/          # directory of per-request response files written by
                        #   the agent (one .response-<requestId>.json per request,
                        #   removed by the driver after read)
-  .last-tick           # epoch ms of last idle tick
+  .last-tick           # epoch ms of the LAST idle tick. Also acts as the
+                       #   readiness signal — its first appearance proves
+                       #   claude booted and a stop-hook fire completed.
+                       #   spawnWarmProcess polls for this, bounded by
+                       #   spawnTimeoutMs, rejecting with SPAWN_TIMEOUT.
   .counters.json       # per-session counters, flushed periodically
   hook.log             # stop-hook stderr log (debug aid)
   stop-hook.sh         # the rendered stop-hook script claude calls
@@ -131,10 +137,14 @@ These are implementation detail. Never expose them on the public API.
 
 ```
 spawn():
-  1. mkdir runtime/sessions/<id>/
-  2. spawn claude with stop-hook script path injected
-  3. wait for .ready (handshake) up to spawnTimeoutMs
-  4. mark idle in pool
+  1. mkdir runtime/sessions/<id>/ (absolute path)
+  2. write .claude/settings.json + stop-hook.sh into the session dir
+  3. launch claude with cwd=<session-dir>, --append-system-prompt,
+     --dangerously-skip-permissions, stdio: ['ignore', 'pipe', 'pipe']
+  4. wait for .last-tick to appear (= first stop hook fired = ready).
+     bounded by spawnTimeoutMs; reject with SPAWN_TIMEOUT and SIGTERM
+     the doomed process if exceeded.
+  5. mark idle in pool
 
 run(prompt):
   1. set .in-request, .request-id

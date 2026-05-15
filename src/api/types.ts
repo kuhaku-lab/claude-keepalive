@@ -10,6 +10,16 @@ export interface ClientOptions {
   claudeBinary?: string;
   /** Base directory for per-session state. Defaults to `./runtime`. */
   runtimeDir?: string;
+  /**
+   * Optional prompt run on each warm session at `prewarm()` time. The
+   * response is discarded. Use a prompt whose prefix matches your real
+   * workload to pre-fill Anthropic's prompt cache too — analogous to the
+   * warmup-request pattern at
+   * https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+   * but applied at the warm-pool layer. If omitted, prewarm() only
+   * amortises CLI process startup; spawn cost is the only thing eliminated.
+   */
+  warmupPrompt?: string;
 }
 
 export interface RunOptions {
@@ -49,6 +59,7 @@ export type KeepaliveErrorCode =
   | 'ABORTED'
   | 'POOL_EXHAUSTED'
   | 'SESSION_CRASHED'
+  | 'SPAWN_TIMEOUT'
   | 'CLAUDE_ERROR'
   | 'INVALID_OPTIONS';
 
@@ -79,6 +90,18 @@ export interface KeepaliveClient {
 
   /** Streaming: yields incremental events. `done` or `error` closes the iterator. */
   runStream(prompt: string, opts?: RunOptions): AsyncIterable<RunStreamEvent>;
+
+  /**
+   * Spawn up to `poolSize` warm sessions, waiting until each is in the idle
+   * stop-hook loop. If `ClientOptions.warmupPrompt` is set, also run that
+   * prompt on every session (response discarded) to populate Anthropic's
+   * prompt cache. Resolves when all warmups complete; rejects with
+   * `SPAWN_TIMEOUT` if any session fails to reach ready in `spawnTimeoutMs`.
+   *
+   * Idempotent. Safe to call from a SIGUSR1 handler or before a known
+   * traffic burst.
+   */
+  prewarm(): Promise<void>;
 
   /** Idempotent. Drains in-flight requests, then force-kills. */
   close(): Promise<void>;
