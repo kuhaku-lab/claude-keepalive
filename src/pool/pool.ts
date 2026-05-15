@@ -143,6 +143,22 @@ export class Pool {
     }
   }
 
+  /**
+   * Proactively spawn warm sessions up to `size` so the first real request
+   * does not pay the cold-start cost. Idempotent — if the pool already has
+   * `size` sessions, returns immediately. If any spawn fails the others
+   * still complete (their sessions remain usable in the pool); the failure
+   * is surfaced to the caller via the rejection.
+   */
+  async prewarm(): Promise<void> {
+    if (this.closed) {
+      throw new KeepaliveError('POOL_EXHAUSTED', 'pool is closed', '');
+    }
+    const need = Math.max(0, this.opts.size - this.entries.size);
+    if (need === 0) return;
+    await Promise.all(Array.from({ length: need }, () => this.spawnTracked()));
+  }
+
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;

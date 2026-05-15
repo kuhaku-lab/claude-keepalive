@@ -54,6 +54,21 @@ LRU is chosen over MRU so that long-idle sessions get a chance to surface bugs (
 
 Do not implement weighted/fair-share allocation in v1. YAGNI until a real workload demands it.
 
+### Known concurrency hazard (filed as v0.1.5)
+
+Today `spawnTracked()` checks `entries.size < size` and *then* `await`s `factory.spawn()` before mutating `entries`. Two concurrent `acquire()` calls can both pass the check and both spawn, briefly oversubscribing the pool. Observed in `examples/test-service` bench (5 sessions with `POOL_SIZE=4`). Fix needs a `pendingSpawns` counter (or placeholder reservation) so the gate is decremented atomically before the await.
+
+## Prewarm
+
+`Pool.prewarm()` proactively spawns warm sessions up to `size` and waits until each is ready (its first `.last-tick` has landed via the session's `.ready` handshake). Idempotent — if the pool already has `size` sessions, returns immediately. Drives the public `client.prewarm()` ([[keepalive-public-api]]).
+
+Use cases:
+- Service startup, so the first user request doesn't pay cold-start.
+- Anticipated traffic bursts (queue drain, scheduled job kickoff).
+- Operator-triggered re-warm via SIGUSR1 handler.
+
+`prewarm()` does **not** restart existing sessions. Combine with `maxRequestsPerSession` / `maxSessionAgeMs` if you want pre-emptive rotation.
+
 ## Isolation policy (rule 2 of [[keepalive-invariants]])
 
 Between requests on the same warm session:

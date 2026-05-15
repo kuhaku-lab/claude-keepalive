@@ -72,6 +72,23 @@ export function buildClient(opts: ClientOptions, deps: ClientDeps): KeepaliveCli
         sleeper: deps.sleeper,
       });
     },
+    async prewarm() {
+      // (1) spawn every pool slot and wait until each session is ready
+      await pool.prewarm();
+      // (2) optional: run warmupPrompt on every session to also warm
+      // Anthropic's prompt cache (cf. the public docs on pre-warming).
+      const wp = opts.warmupPrompt;
+      if (wp) {
+        const poolSize = poolOpts.size;
+        await Promise.all(
+          Array.from({ length: poolSize }, (_, i) =>
+            client
+              .run(wp, { requestId: `warmup-${deps.random.requestId()}-${i}` })
+              .then(() => undefined),
+          ),
+        );
+      }
+    },
     async close() {
       await pool.close();
     },

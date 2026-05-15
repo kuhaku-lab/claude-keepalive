@@ -21,6 +21,19 @@ interface KeepaliveClient {
   /** Streaming: yields incremental events. Completion event closes the iterator. */
   runStream(prompt: string, opts?: RunOptions): AsyncIterable<RunStreamEvent>;
 
+  /**
+   * Proactively spawn up to `poolSize` warm sessions and wait until each
+   * has reached idle-ready (its first stop-hook fire has completed). If
+   * `ClientOptions.warmupPrompt` is set, also run that prompt on every
+   * warm session and discard the result so Anthropic's prompt cache is
+   * pre-filled. Rejects with `SPAWN_TIMEOUT` if any spawn exceeds
+   * `spawnTimeoutMs`. Idempotent.
+   *
+   * Warm-pool-layer analogue of the prompt-cache pre-warming pattern at
+   * platform.claude.com/docs/en/build-with-claude/prompt-caching.
+   */
+  prewarm(): Promise<void>;
+
   /** Idempotent. Drains in-flight requests up to `opts.drainTimeoutMs`, then force-kills. */
   close(): Promise<void>;
 }
@@ -48,6 +61,14 @@ interface ClientOptions {
    * consumers may couple to. See keepalive-invariants rule 9.
    */
   mode?: 'interactive' | 'print';
+  /**
+   * Optional prompt run on every warm session at `prewarm()` time. Response
+   * discarded. Use a prompt whose prefix matches your real workload to also
+   * pre-fill Anthropic's prompt cache — analogous to the warmup-request
+   * pattern at platform.claude.com/docs/en/build-with-claude/prompt-caching.
+   * If omitted, prewarm only amortises CLI spawn cost.
+   */
+  warmupPrompt?: string;
   // ...remaining options unchanged
 }
 
@@ -118,6 +139,7 @@ interface KeepaliveError extends Error {
     | 'ABORTED'              // signal aborted
     | 'POOL_EXHAUSTED'       // no session available within acquireTimeoutMs
     | 'SESSION_CRASHED'      // warm session died mid-request
+    | 'SPAWN_TIMEOUT'        // claude did not reach ready (.last-tick) within spawnTimeoutMs
     | 'CLAUDE_ERROR'         // claude reported an error
     | 'INVALID_OPTIONS';     // zod validation failed
   requestId: string;

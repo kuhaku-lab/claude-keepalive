@@ -198,6 +198,31 @@ for await (const ev of client.runStream(prompt, opts)) {
 }
 ```
 
+### Pre-warming the pool
+
+By default the pool is lazy — sessions spawn on the first request. For a
+service that needs the first real request to be fast (or that anticipates
+a burst), call `prewarm()` at startup to bring all `poolSize` sessions up
+to ready ahead of time:
+
+```ts
+const client = createClient({
+  poolSize: 4,
+  // Optional: also pre-fill Anthropic's prompt cache by running this
+  // prompt on every warm session at prewarm() time. Useful when your
+  // real workload shares a long system prompt or context prefix.
+  warmupPrompt: 'Acknowledge that you are ready.',
+});
+
+await client.prewarm();   // resolves when all 4 sessions are idle-ready
+// First user request now skips CLI cold-start (~5–10 s saved).
+```
+
+This is the warm-pool-layer analogue of [Anthropic's prompt-cache
+pre-warming pattern](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pre-warming-the-cache).
+`prewarm()` alone amortises CLI process startup; pair it with
+`warmupPrompt` to also pre-fill Anthropic's prompt cache.
+
 Granularity of `token` events differs by mode (see table below).
 
 ### Modes: interactive vs print
