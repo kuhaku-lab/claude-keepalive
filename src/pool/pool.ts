@@ -43,7 +43,7 @@ interface Waiter {
 
 export interface PoolEvents {
   'session.spawned': (info: { sessionId: string }) => void;
-  'session.evicted': (info: { sessionId: string; reason: EvictionReason }) => void;
+  'session.evicted': (info: { sessionId: string; reason: EvictionReason; detail?: string }) => void;
 }
 
 export class Pool {
@@ -192,9 +192,9 @@ export class Pool {
       idleSince: this.deps.clock.now(),
       busy: false,
     });
-    session.on('crash', () => {
+    session.on('crash', ({ reason: crashDetail }) => {
       if (this.entries.has(session.id)) {
-        this.evict(session.id, 'crashed');
+        this.evict(session.id, 'crashed', crashDetail);
         this.drainWaiters();
       }
     });
@@ -202,14 +202,18 @@ export class Pool {
     return session;
   }
 
-  private evict(id: string, reason: EvictionReason): void {
+  private evict(id: string, reason: EvictionReason, detail?: string): void {
     const entry = this.entries.get(id);
     if (!entry) return;
     this.entries.delete(id);
     void entry.session.destroy().catch(() => {
       /* best effort */
     });
-    this.emitter.emit('session.evicted', { sessionId: id, reason });
+    this.emitter.emit('session.evicted', {
+      sessionId: id,
+      reason,
+      ...(detail ? { detail } : {}),
+    });
   }
 
   private enqueue(opts: { requestId: string; signal?: AbortSignal }): Promise<Session> {
