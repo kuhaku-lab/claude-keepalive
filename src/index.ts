@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { buildClient } from './api/client.js';
 import type { ClientOptions, KeepaliveClient } from './api/types.js';
 import { systemClock, systemSleeper } from './core/clock.js';
@@ -22,7 +23,15 @@ export type {
 } from './api/types.js';
 
 export function createClient(opts: ClientOptions = {}): KeepaliveClient {
-  const runtimeDir = opts.runtimeDir ?? 'runtime';
+  // Resolve runtimeDir to an absolute path here, at the single entry point.
+  // All paths derived from it (settings.json `command`, hook script's
+  // relative-path file checks, framing's writeFile calls) must be absolute
+  // because claude resolves the Stop-hook `command` against the project /
+  // git root, not against the driver's CWD. If we left runtimeDir relative,
+  // the hook command path would resolve to a non-existent file whenever the
+  // driver's CWD differs from the git root, the hook would never run, and
+  // claude would exit cleanly without ever entering the keepalive loop.
+  const runtimeDir = resolve(opts.runtimeDir ?? 'runtime');
   const claudeBinary = opts.claudeBinary ?? 'claude';
   const spawnTimeoutMs = opts.spawnTimeoutMs ?? 30_000;
   const responseTimeoutMs = opts.defaultTimeoutMs ?? 5 * 60_000;

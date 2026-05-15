@@ -30,16 +30,17 @@ export interface WarmSessionInputs {
  * rule 4).
  */
 /**
- * Maximum bytes of stderr we retain to attach as diagnostic context when the
- * process dies. Kept small on purpose — operators only need a tail.
+ * Maximum bytes of std{out,err} we retain to attach as diagnostic context
+ * when the process dies. Kept small on purpose — operators only need a tail.
  */
-const STDERR_TAIL_BYTES = 4096;
+const PIPE_TAIL_BYTES = 4096;
 
 export class WarmSession implements Session {
   readonly id: string;
   readonly spawnedAt: number;
   private served = 0;
   private destroyed = false;
+  private stdoutTail = '';
   private stderrTail = '';
   private readonly emitter = new EventEmitter();
 
@@ -47,36 +48,42 @@ export class WarmSession implements Session {
     this.id = inputs.id;
     this.spawnedAt = inputs.clock.now();
 
-    // Drain stdout. We carry no protocol on stdout (the file-based transport
-    // does everything), but the OS pipe buffer is finite (~64KB on Linux/
-    // macOS). If we never read, claude's writes will block once the buffer
-    // fills, manifesting as a hang or a SIGPIPE crash. Attaching a `data`
-    // listener is enough to make Node drain the pipe continuously.
-    inputs.proc.stdout?.on('data', () => {
-      /* drain only — we don't care about the contents */
+    // Drain stdout. The file-based transport carries the real protocol, but
+    // the OS pipe buffer is finite (~64KB on Linux/macOS). If we never read,
+    // claude's writes will block once the buffer fills, manifesting as a
+    // hang or a SIGPIPE. Buffer the tail too — when a crash happens with no
+    // stderr (claude exited cleanly through an unexpected path), the stdout
+    // tail is often the only signal of what claude actually did.
+    inputs.proc.stdout?.on('data', (chunk: Buffer) => {
+      this.stdoutTail = (this.stdoutTail + chunk.toString('utf8')).slice(-PIPE_TAIL_BYTES);
     });
 
-    // Drain stderr the same way, but keep a small tail so a crash surfaces
-    // real diagnostic context (claude's error messages, missing flag warnings,
-    // etc.) instead of just `exit:1`.
+    // Drain stderr the same way, separately, because real errors land here.
     inputs.proc.stderr?.on('data', (chunk: Buffer) => {
-      this.stderrTail = (this.stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_BYTES);
+      this.stderrTail = (this.stderrTail + chunk.toString('utf8')).slice(-PIPE_TAIL_BYTES);
     });
 
     inputs.proc.on('exit', (code: number | null) => {
       if (this.destroyed) return;
-      const tail = this.stderrTail.trim();
-      if (tail) {
+      const stderrTail = this.stderrTail.trim();
+      const stdoutTail = this.stdoutTail.trim();
+      if (stderrTail || stdoutTail) {
         // Make the diagnostic visible to operators even if their consumer
         // code never listens to crash events.
-        console.error(
-          `[claude-keepalive] session ${this.id} exited (code=${code ?? 'unknown'}). stderr tail:\n${tail}`,
-        );
+        const parts: string[] = [
+          `[claude-keepalive] session ${this.id} exited (code=${code ?? 'unknown'}).`,
+        ];
+        if (stderrTail) parts.push('--- stderr tail ---', stderrTail);
+        if (stdoutTail) parts.push('--- stdout tail ---', stdoutTail);
+        console.error(parts.join('\n'));
       }
-      const reason = tail
-        ? `exit:${code ?? 'unknown'} -- stderr tail: ${tail.slice(-1024)}`
-        : `exit:${code ?? 'unknown'}`;
-      this.emitter.emit('crash', { reason });
+      const detail =
+        stderrTail || stdoutTail
+          ? `exit:${code ?? 'unknown'}` +
+            (stderrTail ? ` -- stderr: ${stderrTail.slice(-512)}` : '') +
+            (stdoutTail ? ` -- stdout: ${stdoutTail.slice(-512)}` : '')
+          : `exit:${code ?? 'unknown'}`;
+      this.emitter.emit('crash', { reason: detail });
     });
   }
 
