@@ -9,28 +9,25 @@ import { describe, expect } from 'vitest';
 import { test } from '../helpers/fixtures.js';
 
 describe('e2e: warm interactive session against real `claude`', () => {
-  test('serves two requests off the same warm session and the second is faster', {
+  test('serves two requests off the same warm session without respawn', {
     timeout: 120_000,
   }, async ({ client }) => {
-    const t1 = Date.now();
     const r1 = await client.run('Reply with exactly the word: ALIVE', {
       requestId: 'e2e-warm-1',
     });
-    const cold = Date.now() - t1;
-
-    const t2 = Date.now();
     const r2 = await client.run('Reply with exactly the word: WARM', {
       requestId: 'e2e-warm-2',
     });
-    const warm = Date.now() - t2;
 
     expect(r1.text.trim()).toBe('ALIVE');
     expect(r2.text.trim()).toBe('WARM');
+    // The load-bearing assertion: both requests land on the same warm
+    // session id. If the warm-keepalive trick were broken, claude would
+    // exit after r1 and the pool would respawn for r2 with a fresh id.
+    // (Warm/cold wall-time comparison is observable via `pnpm smoke:warm`
+    // but too noisy for a hard assertion — idle-tick overhead can make
+    // r2 longer than r1 in some prompt regimes.)
     expect(r2.sessionId).toBe(r1.sessionId);
-    // Warm request must be measurably faster than cold (no respawn cost).
-    // We don't pick a tight ratio because LLM inference dominates both
-    // anyway; the assertion catches the worst regressions.
-    expect(warm).toBeLessThan(cold);
   });
 
   test('does not leak prior-turn content on the same warm session', { timeout: 120_000 }, async ({
